@@ -1,10 +1,11 @@
 
-name: Build Liam Msoffe Shopping Center v4
+name: Build Liam Msoffe Shopping Center APK
 
 on:
   workflow_dispatch:
   push:
-    branches: [main]
+    branches:
+      - main
 
 jobs:
   build:
@@ -25,47 +26,84 @@ jobs:
           echo "$ANDROID_HOME/cmdline-tools/latest/bin" >> $GITHUB_PATH
           echo "$ANDROID_HOME/platform-tools" >> $GITHUB_PATH
 
-      - name: Accept SDK licenses
+      - name: Accept Android licenses
         run: |
           yes | sdkmanager --licenses || true
 
-      - name: Install SDK packages
+      - name: Install Android SDK
         run: |
           sdkmanager "platforms;android-35" "build-tools;35.0.0"
 
       - name: Install Gradle 8.9
         run: |
-          wget https://services.gradle.org/distributions/gradle-8.9-bin.zip
+          wget -q https://services.gradle.org/distributions/gradle-8.9-bin.zip
           unzip -q gradle-8.9-bin.zip
           echo "$PWD/gradle-8.9/bin" >> $GITHUB_PATH
 
-      - name: Extract v4 Android project
+      - name: Find and extract Android ZIP
         run: |
-          
-mkdir -p extracted
+          mkdir -p extracted
 
-ZIP_FILE=$(find . -maxdepth 1 -type f -iname '*.zip' | head -n 1)
+          echo "Repository files:"
+          ls -la
 
-if [ -z "$ZIP_FILE" ]; then
-  echo "ZIP file not found in repository root ls -laexit 1fi
+          ZIP_FILE=$(find . -maxdepth 1 -type f -iname '*.zip' | grep -v 'gradle-8.9-bin.zip' | head -n 1)
 
-echo "Using ZIP: $ZIP_FILE"
-unzip -o "$ZIP_FILE" -d extracted
-      - name: Verify Android project
+          if [ -z "$ZIP_FILE" ]; then
+            echo "ERROR: No Android source ZIP found!"
+            exit 1
+          fi
+
+          echo "Found ZIP: $ZIP_FILE"
+          unzip -o "$ZIP_FILE" -d extracted
+
+          echo "Extracted files:"
+          find extracted -maxdepth 5 -type f
+
+      - name: Locate Android project
         run: |
-          test -f extracted/LiamAndroid/app/build.gradle
-          test -f extracted/LiamAndroid/app/src/main/assets/index.html
+          PROJECT_DIR=$(find extracted -type f \( -name 'build.gradle' -o -name 'build.gradle.kts' \) | grep '/app/build.gradle' | head -n 1 | sed 's#/app/build.gradle##')
+
+          if [ -z "$PROJECT_DIR" ]; then
+            PROJECT_DIR=$(find extracted -type f \( -name 'build.gradle' -o -name 'build.gradle.kts' \) | head -n 1 | xargs dirname)
+          fi
+
+          if [ -z "$PROJECT_DIR" ]; then
+            echo "ERROR: Android Gradle project not found!"
+            find extracted -type f
+            exit 1
+          fi
+
+          echo "PROJECT_DIR=$PROJECT_DIR" >> $GITHUB_ENV
+          echo "Android project found: $PROJECT_DIR"
+
       - name: Build APK
         run: |
-          cd extracted/LiamAndroid
-          gradle assembleDebug
+          cd "$PROJECT_DIR"
 
-      - name: Verify APK
+          if [ -f gradlew ]; then
+            chmod +x gradlew
+            ./gradlew assembleDebug
+          else
+            gradle assembleDebug
+          fi
+
+      - name: Locate APK
         run: |
-          test -f extracted/LiamAndroid/app/build/outputs/apk/debug/app-debug.apk
+          APK_FILE=$(find "$PROJECT_DIR" -type f -name '*.apk' | grep '/outputs/apk/' | head -n 1)
 
-      - name: Upload APK
+          if [ -z "$APK_FILE" ]; then
+            echo "ERROR: APK was not generated!"
+            find "$PROJECT_DIR" -type f
+            exit 1
+          fi
+
+          echo "APK found: $APK_FILE"
+          echo "APK_FILE=$APK_FILE" >> $GITHUB_ENV
+
+      - name: Upload Android APK
         uses: actions/upload-artifact@v4
         with:
-          name: Liam-Msoffe-Shopping-Center-v4
-          path: extracted/LiamAndroid/app/build/outputs/apk/debug/app-debug.apk
+          name: Liam-Msoffe-Shopping-Center-APK
+          path: ${{ env.APK_FILE }}
+          if-no-files-found: error
