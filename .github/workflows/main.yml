@@ -47,20 +47,14 @@ mkdir -p extracted
 ZIP_FILE=$(find . -maxdepth 1 -type f -iname '*.zip' | head -n 1)
 
 if [ -z "$ZIP_FILE" ]; then
-  echo "ZIP file not found in repository root"
-  ls -la
-  exit 1
-fi
+  echo "ZIP file not found in repository root ls -laexit 1fi
 
 echo "Using ZIP: $ZIP_FILE"
 unzip -o "$ZIP_FILE" -d extracted
-
-
       - name: Verify Android project
         run: |
           test -f extracted/LiamAndroid/app/build.gradle
           test -f extracted/LiamAndroid/app/src/main/assets/index.html
-
       - name: Build APK
         run: |
           cd extracted/LiamAndroid
