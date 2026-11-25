@@ -41,8 +41,20 @@ jobs:
 
       - name: Extract v4 Android project
         run: |
-          test -f Liam_Msoffe_Shopping_Center_v4_Add_Product.zip
-          unzip -o Liam_Msoffe_Shopping_Center_v4_Add_Product.zip -d extracted
+          
+mkdir -p extracted
+
+ZIP_FILE=$(find . -maxdepth 1 -type f -iname '*.zip' | head -n 1)
+
+if [ -z "$ZIP_FILE" ]; then
+  echo "ZIP file not found in repository root"
+  ls -la
+  exit 1
+fi
+
+echo "Using ZIP: $ZIP_FILE"
+unzip -o "$ZIP_FILE" -d extracted
+
 
       - name: Verify Android project
         run: |
